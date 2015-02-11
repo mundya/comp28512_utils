@@ -16,23 +16,32 @@ Revisions
        this.
     b) Call `display_html` to allow any number of Audio elements to appear in a
        block.  Also write WAV files to a temporary directory.
+11/02/2015:
+    - String to NumPy bool arrays
+    - Option to display in Audio
+    - Insert bit errors
 """
 from __future__ import print_function
 
 import base64
 import collections
-from IPython import display
 import logging
 import numpy as np
 import re
 from scipy.io import wavfile
+import struct
 import tempfile
+
+try:
+    from IPython import display
+except ImportError:
+    display = None
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 
 
-def Audio(data, rate, filename=None):
+def Audio(data, rate, filename=None, display_audio=True):
     """Save data to a file then play."""
     # Get a filename
     if filename is None:
@@ -53,7 +62,8 @@ def Audio(data, rate, filename=None):
     print("Data written to {}.".format(filename))
 
     # Read the data back in, display as HTML
-    display.display_html(audio_from_file(filename))
+    if display_audio:
+        display.display_html(audio_from_file(filename))
 
 
 def get_audio_from_file(filename):
@@ -108,3 +118,68 @@ def get_pesq_scores(filename="pesq_results.txt"):
             results[ref][deg] = float(m.group('score'))
 
     return results
+
+
+def bytes_to_bit_array(bytestring):
+    """Converts a string of bytes to a NumPy array of boolean types.
+
+    Example:
+
+        >>> bytes_to_bit_array(b"BBC")
+        array([False,  True, False, False, False, False,  True, False, False,
+                True, False, False, False, False,  True, False, False,  True,
+               False, False, False, False,  True,  True], dtype=bool)
+    """
+    def byte_to_bits(byte):
+        """Convert a single byte to bits."""
+        bits = struct.unpack("B", byte)[0]
+        bit_vals = []
+
+        for i in range(8):
+            bit_vals.append((1 << (7 - i)) & bits != 0)
+
+        return bit_vals
+
+    return np.array(
+        [byte_to_bits(b) for b in bytestring]).reshape(8 * len(bytestring))
+
+
+def bit_array_to_bytes(bitarray):
+    """Converts a bit array to a string of bytes.
+
+    Example:
+
+        >>> b = [False, True, False, False, False, False, True, False]
+        >>> bit_array_to_bytes(np.array(b))
+        'B'
+    """
+    def bits_to_byte(bits):
+        """Convert an array of bits to a byte."""
+        byte = 0
+
+        for (i, b) in enumerate(bits):
+            if b:
+                byte |= (1 << (7 - i))
+
+        return struct.pack('B', byte)
+
+    # Reshape the bit array, then call `bits_to_byte` on each row.
+    assert bitarray.size % 8 == 0
+    bits = bitarray.reshape((bitarray.size / 8, 8))
+    bytearray = []
+
+    for bs in bits:
+        bytearray.append(bits_to_byte(bs))
+
+    return ''.join(bytearray)
+
+
+def insert_bit_errors(data, bit_error_probability):
+    """Insert bit errors into some data with given probability."""
+    errors = np.random.uniform(size=data.size) < bit_error_probability
+    return errors ^ data
+
+
+def insert_bursty_errors(data, bit_error_probability):
+    """Insert bursty errors into some data."""
+    raise NotImplementedError
