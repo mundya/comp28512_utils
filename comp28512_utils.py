@@ -174,12 +174,53 @@ def bit_array_to_bytes(bitarray):
     return ''.join(bytearray)
 
 
+def numpy_array_to_bit_array(data):
+    """Converts a NumPy array of data to a bit array.
+
+    The endinaness of the underlying representation is retained.
+    """
+    return bytes_to_bit_array(data.data)
+
+
+def bit_array_to_numpy_array(data, dtype=np.float):
+    """Convert a bit array back to a NumPy array.
+
+    Examples
+    --------
+
+        >>> a = np.array([1, 2], dtype=np.uint8)
+        >>> bs = numpy_array_to_bit_array(a)
+        >>> b = bit_array_to_numpy_array(bs, dtype=a.dtype)
+        array([1, 2], dtype=uint8)
+
+    Parameters
+    ----------
+    data :
+        An array of bits.
+    dtype : numpy.dtype
+        A NumPy data type, should generally be the same as the one used in
+        creating the bit array.
+    """
+    return np.frombuffer(bit_array_to_bytes(data), dtype=dtype)
+
+
 def insert_bit_errors(data, bit_error_probability):
     """Insert bit errors into some data with given probability."""
     errors = np.random.uniform(size=data.size) < bit_error_probability
     return errors ^ data
 
 
-def insert_bursty_errors(data, bit_error_probability):
-    """Insert bursty errors into some data."""
+def insert_bursty_errors(data, bit_error_probability, block_size=100,
+                         prob_scale=8.0):
+    """Insert bursty errors into some data.
+
+    Parameters
+    ----------
+    data : ndarray
+        A NumPy array of booleans.
+    bit_error_probability : float
+    block_size : int
+        The size of the blocks to insert bit errors in.
+    prob_scale : float
+    """
     raise NotImplementedError
